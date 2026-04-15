@@ -1,0 +1,64 @@
+[
+  {
+    "name": "fran_basic_minimal",
+    "user_id": "fran",
+    "disclosure_map": {
+      "name": true,
+      "last_name": true,
+      "is_over_18": true
+    },
+    "verifier_profiles": ["basic"],
+    "expected_status": 200
+  },
+  {
+    "name": "fran_strict_with_nationality",
+    "user_id": "fran",
+    "disclosure_map": {
+      "name": true,
+      "last_name": true,
+      "is_over_18": true,
+      "nationality": true
+    },
+    "verifier_profiles": ["strict"],
+    "expected_status": 200
+  },
+  {
+    "name": "fran_strict_missing_nationality",
+    "user_id": "fran",
+    "disclosure_map": {
+      "name": true,
+      "last_name": true,
+      "is_over_18": true
+    },
+    "verifier_profiles": ["strict"],
+    "expected_status": 400
+  },
+  {
+    "name": "ana_age_missing",
+    "user_id": "ana",
+    "disclosure_map": {
+      "name": true,
+      "last_name": true
+    },
+    "verifier_profiles": ["age"],
+    "expected_status": 400
+  },
+  {
+    "name": "ana_age_false",
+    "user_id": "ana",
+    "disclosure_map": {
+      "is_over_18": true
+    },
+    "verifier_profiles": ["age"],
+    "expected_status": 400
+  },
+  {
+    "name": "fran_age_check",
+    "user_id": "fran",
+    "disclosure_map": {
+      "is_over_18": true
+    },
+    "verifier_profiles": ["age"],
+    "expected_status": 200
+  }
+]

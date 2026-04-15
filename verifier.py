@@ -18,6 +18,7 @@ ISSUER_PUBLIC_KEY_PATH = Path(
 )
 VERIFIER_BASE_URL = "https://localhost:5001"
 VERIFIER_POLICIES = {
+    "age": {"required_claims": ["is_over_18"]},
     "basic": {"required_claims": ["name", "last_name", "is_over_18"]},
     "strict": {"required_claims": ["name", "last_name", "is_over_18", "nationality"]},
 }
@@ -102,6 +103,21 @@ def verify_kb_and_presentation(sd_jwt_presentation, verifier_id, nonce):
                     "status": "failed",
                     "reason": "missing_required_claims",
                     "missing_claims": missing_claims,
+                    "verifier_profile": verifier_id,
+                }
+            ),
+            400,
+        )
+
+    if verifier_id == "age" and verified.get("is_over_18") is not True:
+        return (
+            jsonify(
+                {
+                    "status": "failed",
+                    "reason": "invalid_claim_value",
+                    "claim": "is_over_18",
+                    "expected": True,
+                    "actual": verified.get("is_over_18"),
                     "verifier_profile": verifier_id,
                 }
             ),

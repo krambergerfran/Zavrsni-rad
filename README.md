@@ -31,6 +31,19 @@ python verifier.py
 python holder.py
 ```
 
+## Dataset za test ulaze
+
+Sustav moze koristiti dataset korisnika iz datoteke `data/users.json`.
+
+- issuer pri pokretanju ucitava korisnike iz `data/users.json`
+- ako datoteka ne postoji, koristi korisnike u kodu
+
+Sustav takoder podrzava scenarije testiranja iz `data/test_cases.json`.
+
+- holder pri pokretanju prvo pokusava ucitati `data/test_cases.json`
+- ako datoteka postoji, automatski izvrsava sve test caseove iz nje
+- ako datoteka ne postoji, pokrece default demo scenarij
+
 
 ## Unlinkability
 

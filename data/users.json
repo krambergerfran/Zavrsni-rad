@@ -1,0 +1,14 @@
+{
+	"fran": {
+		"name": "Fran",
+		"last_name": "Kramberger",
+		"nationality": "Croatia",
+		"is_over_18": true
+	},
+	"ana": {
+		"name": "Ana",
+		"last_name": "Horvat",
+		"nationality": "Croatia",
+		"is_over_18": false
+	}
+}

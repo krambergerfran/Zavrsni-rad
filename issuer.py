@@ -10,8 +10,8 @@ from sd_jwt.common import SDObj
 
 app = Flask(__name__)
 
-# korisnici i podaci za demo
-USERS = {
+# korisnici ako dataset datoteka nije dostupna
+DEFAULT_USERS = {
     "fran": {
         "name": "Fran",
         "last_name": "Kramberger",
@@ -33,7 +33,20 @@ issuer_key = keys["issuer_key"]
 issuer_public_key = keys["issuer_public_key"]
 BASE_DIR = Path(__file__).resolve().parent
 CERTS_DIR = BASE_DIR / "certs"
+DATASET_USERS_PATH = BASE_DIR / "data" / "users.json"
 ISSUER_PUBLIC_KEY_PATH = BASE_DIR / "issuer_public_key.jwk.json"
+
+
+def load_users_dataset():
+    if DATASET_USERS_PATH.exists():
+        with open(DATASET_USERS_PATH, "r", encoding="utf-8") as f:
+            users = json.load(f)
+        if isinstance(users, dict) and users:
+            return users
+    return DEFAULT_USERS
+
+
+USERS = load_users_dataset()
 
 
 # zapisi javni kljuc u datoteku
@@ -58,7 +71,7 @@ def build_claims(user_id):
         "name": user["name"],
         "last_name": user["last_name"],
         SDObj("nationality"): user["nationality"],
-        "is_over_18": user["is_over_18"],
+        SDObj("is_over_18"): user["is_over_18"],
     }
 
 @app.route("/issue_sd-jwt", methods=["POST"])
