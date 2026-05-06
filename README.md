@@ -1,21 +1,17 @@
-# Zavrsni-rad - grana bulletproofs
+# Sustav za zaštitu privatnosti s podrškom za Zero-Knowledge Proof (ZKP) - završni rad
 
-Arhitektura sustava je ista kao na main grani, a ovdje cu opisati dio koji je drugaciji.
+Ova grana nadograđuje osnovnu arhitekturu implementacijom Zero-Knowledge Range Proofs (ZKRP) protokola, konkretno Bulletproofs.
+Dok se main grana oslanja na selektivno otkrivanje sirovih podataka, ovdje je demonstriran napredniji pristup: dokazivanje pripadnosti numeričkog atributa (dob korisnika) određenom rasponu bez otkrivanja same vrijednosti.
 
+## Ključne funkcionalnosti
 
-## Funkcionalnosti
+- **ZKP provjera punoljetnosti**: Korištenjem Bulletproofs algoritma, sustav omogućuje korisniku da dokaže verifikatoru da je punoljetan bez otkrivanja točnog datuma rođenja ili broja godina.
+- **Issuer-side ZKP generiranje**: Zbog specifičnosti implementirane biblioteke, Issuer generira kriptografski dokaz (Bulletproof) isključivo za korisnike koji zadovoljavaju kriterij. Maloljetnim korisnicima se ne izdaje valjan dokaz, čime se onemogućuje lažna prezentacija.
+- **Zaštita od napada zamjenom (Proof Substitution Attack)**: Sustav je dizajniran da detektira pokušaje u kojima jedan korisnik (npr. maloljetna Ana) pokušava iskoristiti presretnuti dokaz drugog korisnika (npr. punoljetni Fran). Verifikator odbija prezentaciju jer dokaz nije kriptografski povezan s identitetom (ključem) onoga tko ga prezentira.
+- **Tehnička implementacija i izgradnja**: Ovaj dio projekta koristi pybulletproofs, Python binding za Rust, radi brzine i preciznosti.
 
-- Issuer generira ZKP (bulletproof) za dob usera (holdera) i daje mu na koristenje
---- za maloljetne usere se ne generira valjan dokaz, na taj nacin se osigurava provjera dobi
-- Holder prezentira dobiveni bulletproof verifieru
-- Verifier provjerava dobivenu prezentaciju ne znajuci nista o godinama holdera
-
-## Pokretanje
-
-### Izgradnja `pybulletproofs`
-
-Ovaj dio projekta ukljucuje ekstenziju (`pybulletproofs`). Koraci za izgradnju:
-
+## Izgradnja ekstenzije
+Za uspješno pokretanje potrebno je kompajlirati Rust kod unutar Python virtualnog okruženja:
 ```bash
 python -m venv venv310
 source venv310/Scripts/activate
@@ -23,52 +19,15 @@ pip install -r requirements.txt
 cd pybulletproofs
 maturin develop --release
 ```
+Napomena: Maturin alat je neophodan za povezivanje Rust koda s Python interpreterom. Budući da je paket specifičan za verziju interpretera, kod svake promjene venv okruženja potrebno je ponoviti maturin develop naredbu.
 
-Napomene:
-- maturin je neophodan za kompajliranje Rust ekstenzije; on se nalazi na popisu u requirements.txt. 
-- nativni instalacijski paket specifican je za Python interpreter koji je koristen za njegovu izgradnju. Ako promijenite virtualno okruzenje (venv), morate ponovno izgraditi pybulletproofs u tom novom okruzenju. 
-- kao alternativu za brže testiranje (iteraciju), mozete koristiti naredbu maturin develop (bez --release) kako biste izbjegli dugotrajnu izgradnju pune "release" verzije. 
-
-Virtualno okruzenje bi se trebalo samostalno aktivirati, ali ako ne:
-
-```bash
-source venv310/Scripts/activate
-```
-
-## Pokretanje sustava i demonstracije
-
-Virtualno okruzenje bi se trebalo samo aktivirati u novom bash terminalu, ali ako ne:
-```bash
-source venv310/Scripts/activate
-```
-
-Nakon toga redom u zasebnim terminalima:
-
-```bash
-python issuer.py
-```
-
-```bash
-python verifier.py
-```
-
-```bash
-python holder.py
-```
-
-## Demonstacija
-
-- koriste se dva usera, fran (punoljetan) i ana (maloljetna)
-- postoje 2 verifiera: 1 koji trazi dokaz i 1 koji ne trazi
-- i fran i ana prolaze test kod verifiera koji ne trazi dokaz
-- fran prolazi, a ana pada test kod verifiera koji trazi dokaz (invalid_age_proof)
-- ana pokusava izvesti napad zamjenom: koristi franov dokaz, ali ni to ne prolazi (invalid_age_proof)
-
-
-## Ogranicenja
-
-- koristena biblioteka (pybulletproofs) ne podrzava generiranje dokaza pomocu zadanog blinding factora, sto znaci da holder ne moze samostalno kreirati dokaze
-- ZKP je zato ostvaren na Issuer strani, tj samo Issuer moze generirati potreban dokaz
-- time je donekle narusen unlinkability
-
+## Demonstracijski scenariji
+U simulaciji sudjeluju dva korisnika: Fran (punoljetan) i Ana (maloljetna).
+ - **Standardna verifikacija**: Oba korisnika uspješno pristupaju verifikatoru koji ne zahtijeva dokaz dobi.
+ - **ZKP verifikacija**: Fran uspješno dokazuje punoljetnost. Ana ne može generirati niti prezentirati valjan dokaz te biva odbijena (invalid_age_proof).
+ - **Simulacija napada**: Ana pokušava iskoristiti Franov dokaz punoljetnosti. Verifikator prepoznaje neslaganje između dokaza i korisničkog ključa (Key Binding) te odbija zahtjev.
+  
+## Ograničenja i sigurnosna analiza
+- trenutna verzija biblioteke pybulletproofs ne podržava eksterni blinding factor, tj. ne može se stvoriti dokaz sa zadanim blinding factorom. Zbog toga Holder ne može samostalno generirati dokaz, već se mora osloniti na Issuer-a
+- s obzirom na to da Issuer generira dokaz, teoretski bi mogao pratiti izdavanje istog, što djelomično utječe na potpunu nepovezivost (unlinkability), ali osigurava praktičnu primjenjivost u sustavima gdje Issuer ionako poznaje identitet korisnika u trenutku izdavanja.
 
