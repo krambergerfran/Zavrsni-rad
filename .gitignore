@@ -1,4 +1,14 @@
 venv/
 __pycache__/
 .env
-*.json
+*.pyc
+
+# Private TLS material - keep out of git
+certs/*.key
+certs/*.csr
+certs/*.ext
+certs/*.srl
+
+# Public files that should stay tracked
+!issuer_public_key.jwk.json
+!certs/*.crt
