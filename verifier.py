@@ -134,7 +134,7 @@ def verify_kb_and_presentation(sd_jwt_presentation, verifier_id, nonce, external
             )
 
             # provjera ispravnosti dokaza
-            valid = zkrp_verify(proof_bytes, commitment_bytes)
+            valid = zkrp_verify(proof_bytes, commitment_bytes, bits=32)
 
             if not valid:
                 return (
