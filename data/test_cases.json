@@ -1,64 +1,68 @@
 [
   {
-    "name": "fran_basic_minimal",
+    "name": "fran_without_age_not_required",
     "user_id": "fran",
     "disclosure_map": {
       "name": true,
       "last_name": true,
-      "is_over_18": true
+      "age": false
     },
-    "verifier_profiles": ["basic"],
+    "verifier_profiles": ["any_age"],
     "expected_status": 200
   },
   {
-    "name": "fran_strict_with_nationality",
+    "name": "ana_without_age_not_required",
+    "user_id": "ana",
+    "disclosure_map": {
+      "name": true,
+      "last_name": true,
+      "age": false
+    },
+    "verifier_profiles": ["any_age"],
+    "expected_status": 200
+  },
+  {
+    "name": "fran_without_age_required",
     "user_id": "fran",
     "disclosure_map": {
       "name": true,
       "last_name": true,
-      "is_over_18": true,
+      "age": false
+    },
+    "verifier_profiles": ["required_adult_age"],
+    "expected_status": 400
+  },
+  {
+    "name": "fran_with_age",
+    "user_id": "fran",
+    "disclosure_map": {
+      "name": true,
+      "last_name": true,
+      "age": true,
       "nationality": true
     },
-    "verifier_profiles": ["strict"],
+    "verifier_profiles": ["required_adult_age"],
     "expected_status": 200
   },
   {
-    "name": "fran_strict_missing_nationality",
-    "user_id": "fran",
+    "name": "ana_with_age",
+    "user_id": "ana",
     "disclosure_map": {
       "name": true,
       "last_name": true,
-      "is_over_18": true
+      "age": true
     },
-    "verifier_profiles": ["strict"],
+    "verifier_profiles": ["required_adult_age"],
     "expected_status": 400
   },
   {
-    "name": "ana_age_missing",
+    "name": "ana_using_frans_proof",
     "user_id": "ana",
     "disclosure_map": {
-      "name": true,
-      "last_name": true
+      "age": true
     },
-    "verifier_profiles": ["age"],
-    "expected_status": 400
-  },
-  {
-    "name": "ana_age_false",
-    "user_id": "ana",
-    "disclosure_map": {
-      "is_over_18": true
-    },
-    "verifier_profiles": ["age"],
-    "expected_status": 400
-  },
-  {
-    "name": "fran_age_check",
-    "user_id": "fran",
-    "disclosure_map": {
-      "is_over_18": true
-    },
-    "verifier_profiles": ["age"],
-    "expected_status": 200
+    "verifier_profiles": ["required_adult_age"],
+    "expected_status": 400,
+    "fake_proof": true
   }
 ]

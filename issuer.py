@@ -1,12 +1,13 @@
 import time
 import ssl
 import json
+import base64
 from pathlib import Path
 from flask import Flask, jsonify, request
 from jwcrypto.jwk import JWK
 from sd_jwt.issuer import SDJWTIssuer
-from sd_jwt.utils.demo_utils import get_jwk
 from sd_jwt.common import SDObj
+from pybulletproofs import zkrp_prove
 
 app = Flask(__name__)
 
@@ -16,25 +17,36 @@ DEFAULT_USERS = {
         "name": "Fran",
         "last_name": "Kramberger",
         "nationality": "Croatia",
-        "is_over_18": True,
+        "age": 22,
     },
     "ana": {
         "name": "Ana",
         "last_name": "Horvat",
         "nationality": "Croatia",
-        "is_over_18": False,
+        "age": 16,
     },
 }
-
-params = {"key_size": 256, "kty": "EC"}
-
-keys = get_jwk(jwk_kwargs=params)
-issuer_key = keys["issuer_key"]
-issuer_public_key = keys["issuer_public_key"]
 BASE_DIR = Path(__file__).resolve().parent
 CERTS_DIR = BASE_DIR / "certs"
 DATASET_USERS_PATH = BASE_DIR / "data" / "users.json"
+ISSUER_PRIVATE_KEY_PATH = BASE_DIR / "issuer_private_key.jwk.json"
 ISSUER_PUBLIC_KEY_PATH = BASE_DIR / "issuer_public_key.jwk.json"
+
+# stvori ili ucitaj issuer kljuceve
+def load_or_create_issuer_keys():
+    if ISSUER_PRIVATE_KEY_PATH.exists():
+        with open(ISSUER_PRIVATE_KEY_PATH, "r", encoding="utf-8") as f:
+            private_jwk = json.load(f)
+        issuer_key_obj = JWK(**private_jwk)
+    else:
+        issuer_key_obj = JWK.generate(kty="EC", crv="P-256")
+        with open(ISSUER_PRIVATE_KEY_PATH, "w", encoding="utf-8") as f:
+            json.dump(issuer_key_obj.export_private(as_dict=True), f, indent=2)
+
+    issuer_public_key_obj = JWK.from_json(issuer_key_obj.export_public())
+    with open(ISSUER_PUBLIC_KEY_PATH, "w", encoding="utf-8") as f:
+        json.dump(issuer_public_key_obj.export_public(as_dict=True), f, indent=2)
+    return issuer_key_obj, issuer_public_key_obj
 
 
 def load_users_dataset():
@@ -48,22 +60,38 @@ def load_users_dataset():
 
 USERS = load_users_dataset()
 
-
-# zapisi javni kljuc u datoteku
-def persist_issuer_public_key():
-    public_jwk = issuer_public_key.export_public(as_dict=True)
-    with open(ISSUER_PUBLIC_KEY_PATH, "w", encoding="utf-8") as f:
-        json.dump(public_jwk, f, indent=2)
+issuer_key, issuer_public_key = load_or_create_issuer_keys()
 
 
-persist_issuer_public_key()
+# funkcija za pretvorbu godina u bulletproofs oblik
+# - issuer generira proof i commitment zajedno
+def make_commitment_for_age(user_id):
+    user = USERS[user_id]
+    user_age = user["age"]
+    if user_age < 18:
+        # maloljetni korisnik nema valjan 18+ proof
+        return None, None
 
+    age_minus_threshold = user_age - 18
+    result = zkrp_prove(age_minus_threshold, 32)
+    # zkrp_prove vraća (proof, commitment, blinding_factor)
+    if len(result) >= 2:
+        proof, commitment = result[0], result[1]
+    else:
+        raise ValueError(f"zkrp_prove returned unexpected format: {result}")
+    
+    proof_bytes = bytes(proof)
+    commitment_bytes = bytes(commitment)
+    
+    encoded_proof = base64.b64encode(proof_bytes).decode('utf-8')
+    encoded_commitment = base64.b64encode(commitment_bytes).decode('utf-8')
+    return encoded_proof, encoded_commitment
 
 # napravi set claimova za issue
-def build_claims(user_id):
+def build_claims(user_id, age_proof=None, age_commitment=None):
     user = USERS[user_id]
     now = int(time.time())
-    return {
+    claims = {
         "iss": "https://localhost:5000",
         "iat": now,
         "exp": now + 3600,
@@ -71,8 +99,14 @@ def build_claims(user_id):
         "name": user["name"],
         "last_name": user["last_name"],
         SDObj("nationality"): user["nationality"],
-        SDObj("is_over_18"): user["is_over_18"],
     }
+    # proof nije sd
+    if age_proof is not None:
+        claims["age_proof"] = age_proof
+    # commitment je sd
+    if age_commitment is not None:
+        claims[SDObj("age")] = age_commitment
+    return claims
 
 @app.route("/issue_sd-jwt", methods=["POST"])
 def issue_sd_jwt():
@@ -101,8 +135,11 @@ def issue_sd_jwt():
         except Exception:
             return jsonify({"error": "Invalid holder public key JWK format in batch"}), 400
 
+        # napravi commitment godina za usera (bulletproofs dio)
+        encoded_proof, encoded_commitment = make_commitment_for_age(user_id)
+        user_claims = build_claims(user_id, age_proof=encoded_proof, age_commitment=encoded_commitment)
+
         # svaki izdani token povezi s holderovim kljucem
-        user_claims = build_claims(user_id)
         issuance = SDJWTIssuer(
             user_claims,
             issuer_key,
