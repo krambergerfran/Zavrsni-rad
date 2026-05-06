@@ -3,12 +3,12 @@
 		"name": "Fran",
 		"last_name": "Kramberger",
 		"nationality": "Croatia",
-		"is_over_18": true
+		"age": 22
 	},
 	"ana": {
 		"name": "Ana",
 		"last_name": "Horvat",
 		"nationality": "Croatia",
-		"is_over_18": false
+		"age": 16
 	}
 }

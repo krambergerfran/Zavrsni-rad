@@ -1,13 +1,14 @@
 import os
 import json
 import ssl
+import base64
 import secrets
 import time
 from pathlib import Path
 from jwcrypto import jwk
 from flask import Flask, jsonify, request
-import requests
 from sd_jwt.verifier import SDJWTVerifier
+from pybulletproofs import zkrp_verify
 
 app = Flask(__name__)
 
@@ -18,14 +19,13 @@ ISSUER_PUBLIC_KEY_PATH = Path(
 )
 VERIFIER_BASE_URL = "https://localhost:5001"
 VERIFIER_POLICIES = {
-    "age": {"required_claims": ["is_over_18"]},
-    "basic": {"required_claims": ["name", "last_name", "is_over_18"]},
-    "strict": {"required_claims": ["name", "last_name", "is_over_18", "nationality"]},
+    "required_adult_age": {"required_claims": []},
+    "any_age": {"required_claims": ["name", "last_name"]},
 }
 # spremnik nonce-a za povezivanje prezentacije i verifiera
 ACTIVE_CHALLENGES = {}
 
-# bolje odrzavanje sustava - ako se presretne nonce ne moze se zauvijek koristiti, cisti memoriju
+# TTL je dobar safety feature
 CHALLENGE_TTL_SECONDS = 60
 
 # izbrisi challenge holdera (nonceve) kojima je istekao TTL
@@ -50,18 +50,13 @@ def load_issuer_public_key():
         key_payload = json.load(f)
     return jwk.JWK(**key_payload)
 
-
-ISSUER_PUBLIC_KEY = load_issuer_public_key()
-
-
 # dohvati kljuc issuera bez pristupanja njemu
 def get_issuer_key(issuer, header):
-    return ISSUER_PUBLIC_KEY
+    return load_issuer_public_key()
 
-def verify_kb_and_presentation(sd_jwt_presentation, verifier_id, nonce):
+def verify_kb_and_presentation(sd_jwt_presentation, verifier_id, nonce, external_age_proof=None):
     # ocitsti challenge
     cleanup_expired_challenges()
-
     # provjera postojanosti verifiera
     if verifier_id not in VERIFIER_POLICIES:
         return jsonify({"error": f"Unknown verifier profile '{verifier_id}'"}), 400
@@ -100,8 +95,6 @@ def verify_kb_and_presentation(sd_jwt_presentation, verifier_id, nonce):
         return (
             jsonify(
                 {
-                    "status": "failed",
-                    "reason": "missing_required_claims",
                     "missing_claims": missing_claims,
                     "verifier_profile": verifier_id,
                 }
@@ -109,20 +102,50 @@ def verify_kb_and_presentation(sd_jwt_presentation, verifier_id, nonce):
             400,
         )
 
-    if verifier_id == "age" and verified.get("is_over_18") is not True:
-        return (
-            jsonify(
-                {
-                    "status": "failed",
-                    "reason": "invalid_claim_value",
-                    "claim": "is_over_18",
-                    "expected": True,
-                    "actual": verified.get("is_over_18"),
-                    "verifier_profile": verifier_id,
-                }
-            ),
-            400,
-        )
+    # ako verifier provjerava godine 
+    if verifier_id == "required_adult_age":
+        # provjera vanjskog dokaza za napad zamjenom
+        if external_age_proof is not None:
+            age_proof = external_age_proof
+        else:
+            age_proof = verified.get("age_proof")
+
+        age_commitment = verified.get("age")
+        if not age_proof or not age_commitment:
+            return (
+                jsonify({"status": "failed", "reason": "invalid_age_proof", "verifier_profile": verifier_id}),
+                400,
+            )
+        try:
+            proof_bytes = base64.b64decode(age_proof)
+            commitment_bytes = base64.b64decode(age_commitment)
+
+            # debug ispis za demonstraciju
+            # verifier vidi samo bajtove, ne tocnu dob
+            print(
+                "[privacy-debug] commitment_len=",
+                len(commitment_bytes),
+                "commitment_hex_prefix=",
+                commitment_bytes[:12],
+                "proof_len=",
+                len(proof_bytes),
+                "proof_hex_prefix=",
+                proof_bytes[:12],
+            )
+
+            # provjera ispravnosti dokaza
+            valid = zkrp_verify(proof_bytes, commitment_bytes)
+
+            if not valid:
+                return (
+                    jsonify({"status": "failed", "reason": "invalid_age_proof", "verifier_profile": verifier_id}),
+                    400,
+                )
+        except Exception as exc:
+            return (
+                jsonify({"status": "failed", "reason": "zkrp_verification_error", "error": str(exc)}),
+                400,
+            )
 
     # sve je zadovoljeno
     return jsonify(
@@ -155,33 +178,20 @@ def issue_challenge(verifier_id):
 
     return jsonify({"nonce": nonce, "aud": aud, "verifier_profile": verifier_id})
 
-# preusmjeravanje na verifikaciju s basic verifierom
-@app.route("/verify_sd-jwt", methods=["POST"])
-def verify_sd_jwt_default():
-    data = request.get_json()
-    sd_jwt_presentation = data.get("sd_jwt_presentation")
-    nonce = data.get("nonce")
-
-    if not sd_jwt_presentation:
-        return jsonify({"error": "Missing 'sd_jwt_presentation' in request body"}), 400
-    if not nonce:
-        return jsonify({"error": "Missing 'nonce' in request body"}), 400
-
-    return verify_kb_and_presentation(sd_jwt_presentation, "basic", nonce)
-
 # preusmjeravanje na verifikaciju sa zadanim verifierom
 @app.route("/verify_sd-jwt/<verifier_id>", methods=["POST"])
 def verify_sd_jwt(verifier_id):
     data = request.get_json()
     sd_jwt_presentation = data.get("sd_jwt_presentation")
     nonce = data.get("nonce")
+    external_age_proof = data.get("age_proof")
 
     if not sd_jwt_presentation:
         return jsonify({"error": "Missing 'sd_jwt_presentation' in request body"}), 400
     if not nonce:
         return jsonify({"error": "Missing 'nonce' in request body"}), 400
 
-    return verify_kb_and_presentation(sd_jwt_presentation, verifier_id, nonce)
+    return verify_kb_and_presentation(sd_jwt_presentation, verifier_id, nonce, external_age_proof=external_age_proof)
 
 # implementacija mTLSa 
 def create_ssl_context():

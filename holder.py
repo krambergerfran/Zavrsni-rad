@@ -1,6 +1,7 @@
 import requests
 import hashlib
 import json
+import base64
 from pathlib import Path
 from jwcrypto.jwk import JWK
 from sd_jwt.holder import SDJWTHolder
@@ -66,8 +67,10 @@ def get_verifier_challenge(verifier_id):
     return response.json()
 
 
-def verify_presentation(sd_jwt_presentation, verifier_id, nonce):
+def verify_presentation(sd_jwt_presentation, verifier_id, nonce, age_proof=None, age_commitment=None):
 	request_data = {"sd_jwt_presentation": sd_jwt_presentation, "nonce": nonce}
+	if age_proof is not None:
+		request_data["age_proof"] = age_proof
 	response = requests.post(
 		f"{VERIFIER_URL}/verify_sd-jwt/{verifier_id}",
 		json=request_data,
@@ -75,7 +78,10 @@ def verify_presentation(sd_jwt_presentation, verifier_id, nonce):
 		verify=TLS_VERIFY,
 		cert=CLIENT_CERT,
 	)
-	return response.status_code, response.json()
+	try:
+		return response.status_code, response.json()
+	except Exception:
+		return response.status_code, {"raw_text": response.text[:1200]}
 
 # vrati ocekivani status za verifiera
 def expected_for_verifier(expected_status, verifier_id):
@@ -85,6 +91,24 @@ def expected_for_verifier(expected_status, verifier_id):
 	# status je dict za vise verifiera
 	if isinstance(expected_status, dict):
 		return expected_status.get(verifier_id)
+
+# izvlacenje dokaza iz dobivenog tokena
+def extract_age_proof_from_sd_jwt(sd_jwt_issuance):
+	parts = sd_jwt_issuance.split("~")
+	if not parts or not parts[0]:
+		return None
+
+	jwt_parts = parts[0].split(".")
+	if len(jwt_parts) < 2:
+		return None
+
+	payload_b64 = jwt_parts[1]
+	payload_b64 += "=" * (-len(payload_b64) % 4)
+	try:
+		payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
+		return payload.get("age_proof")
+	except Exception:
+		return None
 	
 
 # pokretanje jednog test casea
@@ -93,8 +117,9 @@ def run_single_case(case):
 	case_name = case.get("name", "unnamed_case")
 	user_id = case.get("user_id", "fran")
 	disclosure_map = case.get("disclosure_map")
-	verifier_profiles = case.get("verifier_profiles", ["basic", "strict"])
+	verifier_profiles = case.get("verifier_profiles", ["required_adult_age", "any_age"])
 	expected_status = case.get("expected_status") # izlazni status (200 ili 400)
+	fake_proof = case.get("fake_proof", False)
 
 	# ucitaj tokene za usera
 	token_pool = issue_tokens(user_id, len(verifier_profiles))
@@ -122,17 +147,18 @@ def run_single_case(case):
 			sign_alg="ES256",
 		)
 		output = holder.sd_jwt_presentation
+		override_age_proof = None
+
+		# ana salje svoj token, ali uz to stavlja franov age proof
+		if fake_proof:
+			fran_credential = issue_tokens("fran", 1)[0]
+			override_age_proof = extract_age_proof_from_sd_jwt(fran_credential["sd_jwt"])
 
 		# status i rezultat verifikacije
-		status_code, payload = verify_presentation(output, verifier_id, nonce)
+		status_code, payload = verify_presentation(output, verifier_id, nonce, age_proof=override_age_proof)
 
 		# dohvati ocekivan status testa
 		expected = expected_for_verifier(expected_status, verifier_id)
-
-		if status_code == expected:
-			match = True
-		else:
-			match = False
 
 
 		# ispis podataka o testu
@@ -171,9 +197,9 @@ def run_demo(user_id="fran"):
 			"disclosure_map": {
 				"name": True,
 				"last_name": True,
-				"is_over_18": True,
+				"age": 22,
 			},
-			"verifier_profiles": ["basic", "strict"],
+			"verifier_profiles": ["required_adult_age", "any_age"],
 		},
 		{
 			"name": "demo_with_nationality",
@@ -181,10 +207,10 @@ def run_demo(user_id="fran"):
 			"disclosure_map": {
 				"name": True,
 				"last_name": True,
-				"is_over_18": True,
+				"age": 22,
 				"nationality": True,
 			},
-			"verifier_profiles": ["basic", "strict"],
+			"verifier_profiles": ["required_adult_age", "any_age"],
 		},
 	]
 	run_test_cases(default_cases)

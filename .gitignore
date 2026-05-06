@@ -12,3 +12,9 @@ certs/*.srl
 # Public files that should stay tracked
 !issuer_public_key.jwk.json
 !certs/*.crt
+venv310/
+issuer_private_key.jwk.json
+*.log
+.vscode/
+.pytest_cache/
+.mypy_cache/
