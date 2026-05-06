@@ -20,17 +20,17 @@ Prototip se temelji na trostranom modelu povjerenja:
 ## Ključne funkcionalnosti sustava
 Sustav implementira napredne mehanizme zaštite privatnosti i integriteta podataka kroz sljedeće funkcionalnosti:
 
-Batch izdavanje vjerodajnica (Mass Issuance): Podrška za izdavanje skupa tokena (vjerodajnica) u jednom koraku, pri čemu je svaki token vezan uz jedinstveni kriptografski ključ korisnika (Holder key), čime se osigurava visoka razina skalabilnosti.
+ - **Batch izdavanje vjerodajnica (Batch Issuance)**: Podrška za izdavanje skupa tokena (vjerodajnica) u jednom koraku, pri čemu je svaki token vezan uz jedinstveni kriptografski ključ korisnika (Holder key), čime se osigurava visoka razina skalabilnosti.
 
-Rotacija tokena i sprječavanje povezivosti (Unlinkability): Implementiran je sustav spremnika tokena (Token Pool) koji omogućuje korisniku da za svaku prezentaciju koristi novi, neovisni token, čime se onemogućuje verifikatorima praćenje i profiliranje korisnika kroz različite interakcije.
+ - **Rotacija tokena i sprječavanje povezivosti (Unlinkability)**: Implementiran je sustav spremnika tokena (Token Pool) koji omogućuje korisniku da za svaku prezentaciju koristi novi, neovisni token, čime se onemogućuje verifikatorima praćenje i profiliranje korisnika kroz različite interakcije.
 
-Kriptografsko povezivanje ključa (Key Binding): Osigurana je autentičnost prezentacije putem cnf (Confirmation) zahtjeva unutar SD-JWT-a. Korištenjem jwk (JSON Web Key), te parametara nonce i aud (Audience), sustav sprječava napade ponavljanjem (Replay attacks) i osigurava da vjerodajnicu može prezentirati samo legitimni vlasnik ključa.
+ - **Kriptografsko povezivanje ključa (Key Binding)**: Osigurana je autentičnost prezentacije putem cnf (Confirmation) zahtjeva unutar SD-JWT-a. Korištenjem jwk (JSON Web Key), te parametara nonce i aud (Audience), sustav sprječava napade ponavljanjem (Replay attacks) i osigurava da vjerodajnicu može prezentirati samo legitimni vlasnik ključa.
 
-Izvanmrežna verifikacija (Offline Verification): Dizajn sustava omogućuje verifikatoru potpunu provjeru vjerodostojnosti i integriteta podataka bez potrebe za sinkronom komunikacijom s izdavačem (Issuer), što povećava brzinu odziva i štiti privatnost korisnika (izdavač ne zna kada i gdje se vjerodajnica koristi).
+ - **Izvanmrežna verifikacija (Offline Verification)**: Dizajn sustava omogućuje verifikatoru potpunu provjeru vjerodostojnosti i integriteta podataka bez potrebe za sinkronom komunikacijom s izdavačem (Issuer), što povećava brzinu odziva i štiti privatnost korisnika (izdavač ne zna kada i gdje se vjerodajnica koristi).
 
-Sigurnost transportnog sloja: Sva komunikacija između sudionika (Issuer, Holder, Verifier) odvija se isključivo putem zaštićenog HTTPS protokola uz obaveznu mTLS (mutual TLS) autentifikaciju, osiguravajući povjerljivost i integritet kanala.
+ - **Sigurnost transportnog sloja**: Sva komunikacija između sudionika (Issuer, Holder, Verifier) odvija se isključivo putem zaštićenog HTTPS protokola uz obaveznu mTLS (mutual TLS) autentifikaciju, osiguravajući povjerljivost i integritet kanala.
 
-Upravljanje stanjem izazova (Challenge Management): Implementiran je mehanizam za upravljanje životnim vijekom nonce parametara (TTL - Time to Live) uz automatski proces čišćenja (Cleanup) isteklih izazova, čime se optimiziraju resursi i jača sigurnost sustava protiv zastarjelih zahtjeva.
+ - **Upravljanje stanjem izazova (Challenge Management)**: Implementiran je mehanizam za upravljanje životnim vijekom nonce parametara (TTL - Time to Live) uz automatski proces čišćenja (Cleanup) isteklih izazova, čime se optimiziraju resursi i jača sigurnost sustava protiv zastarjelih zahtjeva.
 
 ## Pokretanje
 
